@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPark TCC | Painel Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        /* =========================================================
+           ESTILOS DO PAINEL (CSS DE ALTO NÍVEL)
+           ========================================================= */
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+        body { background-color: var(--bg-color); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; }
+
+        /* Cabeçalho */
+        header { background-color: var(--card-bg); padding: 20px 40px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        header h1 { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+        .status-badge { background-color: rgba(16, 185, 129, 0.2); color: var(--success); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .status-badge::before { content: ''; display: block; width: 8px; height: 8px; background-color: var(--success); border-radius: 50%; box-shadow: 0 0 8px var(--success); }
+
+        /* Área Principal */
+        main { flex: 1; padding: 40px; max-width: 1200px; margin: 0 auto; width: 100%; }
+        .dashboard-title { margin-bottom: 30px; color: var(--text-muted); font-size: 1.1rem; }
+
+        /* Grelha de Cards */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+
+        /* Estilo do Card da Vaga */
+        .card { background-color: var(--card-bg); border-radius: 16px; padding: 24px; border: 1px solid #334155; transition: transform 0.2s; position: relative; overflow: hidden; }
+        .card:hover { transform: translateY(-5px); }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .vaga-id { font-size: 1.2rem; font-weight: 600; }
+        .vaga-icon { font-size: 2rem; }
+
+        .vaga-status { font-size: 2rem; font-weight: 800; text-transform: uppercase; margin-bottom: 10px; }
+        .vaga-desc { color: var(--text-muted); font-size: 0.9rem; }
+
+        /* Cores Dinâmicas controladas pelo JS */
+        .status-livre { color: var(--success); }
+        .status-ocupada { color: var(--danger); }
+        .bg-livre { background: linear-gradient(145deg, rgba(16, 185, 129, 0.1) 0%, transparent 100%); }
+        .bg-ocupada { background: linear-gradient(145deg, rgba(239, 68, 68, 0.1) 0%, transparent 100%); }
+
+        /* Rodapé */
+        footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.9rem; border-top: 1px solid #334155; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>SMARTPARK</h1>
+        <div class="status-badge" id="firebase-status">Conectando Firebase...</div>
+    </header>
+
+    <main>
+        <div class="dashboard-title">Monitoramento em Tempo Real</div>
+        
+        <div class="grid">
+            <div class="card" id="card-vaga-1">
+                <div class="card-header">
+                    <span class="vaga-id">Vaga 01</span>
+                    <span class="vaga-icon">🚗</span>
+                </div>
+                <div class="vaga-status" id="status-texto-1">A CARREGAR...</div>
+                <div class="vaga-desc" id="status-desc-1">Aguardando dados do sensor...</div>
+            </div>
+            
+            </div>
+    </main>
+
+    <footer>
+        Painel de Administração Web - TCC IoT
+    </footer>
+
+    <script type="module">
+        // Importando as bibliotecas nativas do Firebase v10 via CDN
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        // As suas credenciais exatas do TCC
+        const firebaseConfig = {
+            apiKey: "AIzaSyDVkRoJ9NGWkEoGIuXW61089vg4rzWXT6c",
+            projectId: "paraai-9514f",
+            databaseURL: "https://paraai-9514f-default-rtdb.firebaseio.com/"
+        };
+
+        // Inicializa o Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Atualiza a bolinha de status no topo da página
+        document.getElementById('firebase-status').innerText = "Nuvem Conectada";
+
+        // Referência para o documento exato que o seu ESP32 atualiza
+        const vagaRef = doc(db, "vagas", "1");
+
+        // Função "onSnapshot" fica a ouvir alterações em tempo real!
+        onSnapshot(vagaRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const dados = docSnap.data();
+                const estaOcupada = dados.ocupada; // Lê o boolean que o ESP32 enviou
+
+                // Elementos da Interface
+                const card = document.getElementById('card-vaga-1');
+                const textoStatus = document.getElementById('status-texto-1');
+                const textoDesc = document.getElementById('status-desc-1');
+
+                // Limpa as classes antigas
+                card.classList.remove('bg-livre', 'bg-ocupada');
+                textoStatus.classList.remove('status-livre', 'status-ocupada');
+
+                // Atualiza o visual consoante o estado
+                if (estaOcupada) {
+                    textoStatus.innerText = "OCUPADA";
+                    textoStatus.classList.add('status-ocupada');
+                    card.classList.add('bg-ocupada');
+                    textoDesc.innerText = "Veículo detetado pelo sensor ultrassónico.";
+                } else {
+                    textoStatus.innerText = "LIVRE";
+                    textoStatus.classList.add('status-livre');
+                    card.classList.add('bg-livre');
+                    textoDesc.innerText = "Vaga disponível para estacionamento.";
+                }
+                
+                console.log("Atualização recebida do ESP32:", estaOcupada ? "Ocupada" : "Livre");
+            } else {
+                console.log("O documento vagas/1 não foi encontrado no banco de dados.");
+            }
+        }, (error) => {
+            console.error("Erro ao ler do Firebase:", error);
+            document.getElementById('firebase-status').innerText = "Erro de Conexão";
+            document.getElementById('firebase-status').style.color = "var(--danger)";
+        });
+    </script>
+</body>
+</html>
